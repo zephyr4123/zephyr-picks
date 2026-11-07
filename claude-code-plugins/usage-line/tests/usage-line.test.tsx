@@ -59,7 +59,7 @@ const spanWith = (spans: ReturnType<typeof spansOf>, text: string) => spans.find
 
 describe('这一行：内容与顺序', () => {
   test('宽度够时分两组：左边当前号（标签、额度、上下文），竖线右边是另一个号', async () => {
-    expect(textOf()).toBe('  Max   5h 22%  7d 26%  ctx 41% | Pro 5h 3% 7d 41%')
+    expect(textOf()).toBe('   Max       5h 22%  7d 26%  ctx 41%  |  Pro  5h 3%  7d 41%')
   })
 
   test('从 200 列到 5 列，每种宽度都放得下，且不用宽度不定的字符', async () => {
@@ -73,18 +73,21 @@ describe('这一行：内容与顺序', () => {
   })
 
   test('变窄时账号标签留到最后，依次丢掉：另一个号、上下文、7d、5h', async () => {
-    expect(textOf({}, 40)).toBe('  Max   5h 22%  7d 26%  ctx 41%')
-    expect(textOf({}, 28)).toBe('  Max   5h 22%  7d 26%')
-    expect(textOf({}, 19)).toBe('  Max   5h 22%')
-    expect(textOf({}, 10)).toBe('  Max  ')
+    expect(textOf({}, 40)).toBe('   Max       5h 22%  7d 26%  ctx 41%')
+    expect(textOf({}, 28)).toBe('   Max       5h 22%  7d 26%')
+    expect(textOf({}, 19)).toBe('   Max       5h 22%')
+    expect(textOf({}, 10)).toBe('   Max   ')
   })
 
-  test('间距分三级：同一个东西内部 1 格，同组各项 2 格，两组之间竖线两边各 1 格', async () => {
+  test('间距分三级，组内比组间明显近：一项内部 1 格，同组各项 2 格，组与组之间约 4 格', async () => {
     const spans = spansOf()
     const chipEnd = spans.map(s => s.bg !== undefined).lastIndexOf(true)
-    expect(spans[chipEnd + 1]).toEqual({ text: ' ' })
+    // 账号列和额度之间 4 格：比组内的 2 格大一倍，第二行的「登录剩3d」才不会被读成额度里的一项
+    expect(spans[chipEnd + 1]).toEqual({ text: '    ' })
     const rule = spans.findIndex(s => s.text === '|')
-    expect([spans[rule - 1]?.text, spans[rule + 1]?.text]).toEqual([' ', ' '])
+    expect([spans[rule - 1]?.text, spans[rule + 1]?.text]).toEqual(['  ', '  '])
+    // 另一个号组内也是 2 格，和当前号一个规则
+    expect(textOf()).toContain('Pro  5h 3%  7d 41%')
     expect(textOf()).toContain('5h 22%  7d 26%')
   })
 
@@ -95,7 +98,7 @@ describe('这一行：内容与顺序', () => {
   test('两个号套餐相同时，带上邮箱前 4 位区分', async () => {
     const text = textOf({ peers: [{ ...PRO, plan: 'Max' }] })
     expect(text).toContain(' Max-jivu ')
-    expect(text).toContain('Max-chri 5h 3%')
+    expect(text).toContain('Max-chri  5h 3%')
   })
 })
 
@@ -107,14 +110,14 @@ describe('这一行：层级与颜色', () => {
     // 色块拉宽到和下面的登录状态同宽，名字居中；补的空白也是同一个底色
     const chip = spans.filter(s => s.bg !== undefined)
     expect(new Set(chip.map(s => s.bg))).toEqual(new Set([COLORS.plans.Max?.color]))
-    expect(widthOf(chip)).toBe(widthOf([{ text: '登录23d' }]))
-    expect(chip.map(s => s.text).join('')).toBe('  Max  ')
+    expect(widthOf(chip)).toBe(widthOf([{ text: '登录剩23d' }]))
+    expect(chip.map(s => s.text).join('')).toBe('   Max   ')
   })
 
   test('两行从同一个左边缘开始：第二行没有缩进，账号下面就是它的登录状态', async () => {
     const { top, bottom } = lineOf()
     expect(top[0]?.bg).toBe(COLORS.plans.Max?.color)
-    expect(columnOf(bottom, '登录23d')).toBe(0)
+    expect(columnOf(bottom, '登录剩23d')).toBe(0)
   })
 
   test('颜色都写主题色名，跟着浅色、深色主题走；只有 Max 标签上的深色字是固定的', async () => {
@@ -195,45 +198,48 @@ describe('这一行：层级与颜色', () => {
 
   test('上下文下面写还剩多少就压缩，对齐在 ctx 正下方，快到时跟着变色', async () => {
     const { top, bottom } = lineOf()
-    expect(columnOf(bottom, '余94K')).toBe(columnOf(top, 'ctx '))
-    expect(spanWith(bottom, '余94K')?.color).toBe(COLORS.label)
-    expect(spanWith(lineOf({ snap: { ...SNAP, tokens: 130_000 } }).bottom, '余30K')?.color).toBe(COLORS.warn)
-    expect(bottomOf({ snap: { ...SNAP, tokens: 170_000 } })).not.toContain('余')
+    expect(columnOf(bottom, '剩94K')).toBe(columnOf(top, 'ctx '))
+    expect(spanWith(bottom, '剩94K')?.color).toBe(COLORS.label)
+    expect(spanWith(lineOf({ snap: { ...SNAP, tokens: 130_000 } }).bottom, '剩30K')?.color).toBe(COLORS.warn)
+    expect(lineOf({ snap: { ...SNAP, tokens: 170_000 } }).bottom.some(s => s.text.startsWith('剩'))).toBe(false)
     const big = { ...SNAP, tokens: 320_000, window: 1_000_000, threshold: 600_000 }
     expect(textOf({ snap: big })).toContain('ctx 53%')
-    expect(bottomOf({ snap: big })).toContain('余280K')
-    expect(bottomOf({ snap: { ...big, tokens: 10_000, threshold: 1_600_000, window: 2_000_000 } })).toContain('余1.6M')
+    expect(bottomOf({ snap: big })).toContain('剩280K')
+    expect(bottomOf({ snap: { ...big, tokens: 10_000, threshold: 1_600_000, window: 2_000_000 } })).toContain('剩1.6M')
   })
 
-  test('没开自动压缩：按整个窗口算，下面不写余量', async () => {
+  test('没开自动压缩：按整个窗口算，下面不写还剩多少', async () => {
     const off = { ...SNAP, threshold: null }
     expect(textOf({ snap: off })).toContain('ctx 33%')
-    expect(bottomOf({ snap: off })).not.toContain('余')
+    expect(lineOf({ snap: off }).bottom.some(s => s.text.startsWith('剩'))).toBe(false)
   })
 
-  test('窗口已过重置时间、之后没有新记录：上面 - 不拿旧数字充数，下面写"未开始"说明为什么没数', async () => {
+  test('窗口已过重置时间、之后没有新记录：上面 - 不拿旧数字充数，下面写"未用"说明为什么没数', async () => {
     // 空状态要说清是什么情况：只摆一个 - 会让人以为坏了
     const stale: Peer = { ...PRO, limits: [{ kind: 'five_hour', percentUsed: 70, resetsAt: new Date(NOW - MIN).toISOString() }] }
     const { top, bottom } = lineOf({ peers: [stale] })
     const text = top.map(s => s.text).join('')
-    expect(text).toContain('Pro 5h -')
+    expect(text).toContain('Pro  5h -')
     expect(text).not.toContain('70%')
     const peerItem = top.findIndex((s, i) => s.text === '5h ' && i > top.findIndex(x => x.text === 'Pro'))
-    expect(columnOf(bottom, '未开始')).toBe(widthOf(top.slice(0, peerItem)))
-    expect(spanWith(bottom, '未开始')?.color).toBe(COLORS.label)
+    expect(columnOf(bottom, '未用')).toBe(widthOf(top.slice(0, peerItem)))
+    expect(spanWith(bottom, '未用')?.color).toBe(COLORS.label)
+    // 「未用」和「5h -」一样宽：不用为对齐补空白，组内间距保持 2 格
+    expect(widthOf([{ text: '未用' }])).toBe(widthOf([{ text: '5h -' }]))
     // 当前号也一样
     const expired = { ...SNAP, threshold: null, limits: [{ kind: 'five_hour', percentUsed: 50, resetsAt: new Date(NOW - MIN).toISOString() }] }
     expect(textOf({ snap: expired, peers: [] })).toContain('5h -')
-    expect(bottomOf({ snap: expired, peers: [] })).toContain('未开始')
+    expect(bottomOf({ snap: expired, peers: [] })).toContain('未用')
   })
 
-  test('当前号的登录还剩多久写在色块正下方：平时灰，3 天内黄，1 天内红，过期写登录过期', async () => {
+  test('当前号的登录还剩多久写在色块正下方：平时灰，3 天内黄，1 天内红，过期写需重新登录', async () => {
     const at = (ms: number) => ({ ...MAX, loginExpiresAt: new Date(NOW + ms).toISOString() })
     const status = (ms: number) => lineOf({ self: at(ms), peers: [] }).bottom[0]
-    expect(status(10 * DAY)).toEqual({ text: '登录10d', color: COLORS.label })
-    expect(status(2.5 * DAY)).toEqual({ text: '登录2d', color: COLORS.warn })
-    expect(status(5 * HOUR)).toEqual({ text: '登录5h', color: COLORS.danger })
-    expect(status(-MIN)).toEqual({ text: '登录过期', color: COLORS.danger })
+    // 写「剩」：只写「登录3d」分不清是已登录 3 天还是还剩 3 天；过期了直接说该做什么
+    expect(status(10 * DAY)).toEqual({ text: '登录剩10d', color: COLORS.label })
+    expect(status(2.5 * DAY)).toEqual({ text: '登录剩2d', color: COLORS.warn })
+    expect(status(5 * HOUR)).toEqual({ text: '登录剩5h', color: COLORS.danger })
+    expect(status(-MIN)).toEqual({ text: '需重新登录', color: COLORS.danger })
     expect(textOf({ self: at(2.5 * DAY), peers: [] })).not.toContain('登录')
   })
 
@@ -242,8 +248,8 @@ describe('这一行：层级与颜色', () => {
     expect(bottomOf().split('|')[1]).not.toContain('登录')
     const soon: Peer = { ...PRO, loginExpiresAt: new Date(NOW + DAY + HOUR).toISOString() }
     const { top, bottom } = lineOf({ peers: [soon] })
-    expect(columnOf(bottom, '登录1d')).toBe(columnOf(top, 'Pro'))
-    expect(spanWith(bottom, '登录1d')?.color).toBe(COLORS.warn)
+    expect(columnOf(bottom, '登录剩1d')).toBe(columnOf(top, 'Pro'))
+    expect(spanWith(bottom, '登录剩1d')?.color).toBe(COLORS.warn)
   })
 
   test('倒计时读起来短', async () => {

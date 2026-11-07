@@ -106,15 +106,15 @@ const LOGIN_WARN_MS = 3 * 24 * 60 * 60 * 1000
 const DAY = 24 * 60 * 60 * 1000
 const HOUR = 60 * 60 * 1000
 
-// 间距分三级，靠得近的才是一组：
-//   1 格：同一个东西内部——标签和数值；账号标签和后面的额度（标签自带底色的内边距，再隔 1 格就够）
-//   2 格：同组的各项之间
-//   竖线两边各 1 格：组与组之间靠竖线分，不靠大段空白——空白一多整行就散了
-// 另一个号是次要信息，组内各项也只隔 1 格，排得更紧
-const BADGE_GAP = ' '
+// 间距分三级，靠得近的才是一组；组内要比组间明显近，组间大约是组内的两倍：
+//   1 格：一项内部——标签和数值（5h 7%）
+//   2 格：同组的各项之间，两个号一个规则
+//   约 4 格：组与组之间——账号列和额度之间空 4 格；两个号之间竖线两边各 2 格
+// 账号列只隔 1 格时，第二行的「登录剩3d」会和后面的倒计时粘成一串，读成额度里的一项
+const BADGE_GAP = '    '
 const ITEM_GAP = '  '
-const PEER_GAP = ' '
-const GROUP_GAP = ' '
+const PEER_GAP = '  '
+const GROUP_GAP = '  '
 
 export function compose(input: LineInput): Line {
   let line: Line = { top: [], bottom: [] }
@@ -237,7 +237,8 @@ const KIND_ORDER = ['five_hour', 'seven_day']
  * 每个窗口一列：上格 `5h 24%`，下格还有多久重置（`2h13m`）。
  * 快用完时数值和倒计时一起变色；平时倒计时用标签灰，不抢数字。
  * 窗口已过重置时间、之后没有新记录的，上格显示 `-`，不拿过时的数字充数；
- * 下格写"未开始"——新窗口要等这个号下次发消息才开始计时。空状态要说清是什么情况，只摆一个 - 会让人以为坏了。
+ * 下格写"未用"——重置后这个号还没用过，新窗口要等它下次发消息才开始计时。
+ * 空状态要说清是什么情况，只摆一个 - 会让人以为坏了；"未用"和"5h -"一样宽，不用为对齐补空白。
  */
 function windows(limits: Limit[], now: number, p: Palette, o: { peer: boolean; max: number }): Cell[] {
   return [...limits]
@@ -246,7 +247,7 @@ function windows(limits: Limit[], now: number, p: Palette, o: { peer: boolean; m
     .map(limit => {
       const label: Span = { text: `${limitLabel(limit.kind)} `, color: p.label }
       const at = limit.resetsAt === undefined ? NaN : Date.parse(limit.resetsAt)
-      if (Number.isFinite(at) && at <= now) return { top: [label, { text: '-', color: p.label }], bottom: [{ text: '未开始', color: p.label }] }
+      if (Number.isFinite(at) && at <= now) return { top: [label, { text: '-', color: p.label }], bottom: [{ text: '未用', color: p.label }] }
 
       const fraction = limit.percentUsed / 100
       const top: Span[] = [label, { text: `${Math.round(limit.percentUsed)}%`, ...tone(fraction, o.peer ? p.label : p.value, p, !o.peer) }]
@@ -269,17 +270,18 @@ function rank(kind: string): number {
 
 /**
  * 登录还剩多久，写在账号正下方，和第二行其他格子"还剩多久"一个意思。
- * 平时灰色，3 天内变黄，1 天内变红，过期写"登录过期"。
+ * 写成"登录剩3d"：少了"剩"字，"登录3d"会被读成"已经登录 3 天"。
+ * 平时灰色，3 天内变黄，1 天内变红；过期了直接说该做什么："需重新登录"。
  * 当前号一直显示（always）；另一个号是次要信息，只在 3 天内快过期时才出现。
  */
 function loginStatus(expiresAt: string | null, now: number, p: Palette, o: { always: boolean }): Span[] {
   if (expiresAt === null) return []
   const left = Date.parse(expiresAt) - now
   if (!Number.isFinite(left)) return []
-  if (left <= 0) return [{ text: '登录过期', color: p.danger }]
-  if (left < DAY) return [{ text: `登录${Math.ceil(left / HOUR)}h`, color: p.danger }]
-  if (left <= LOGIN_WARN_MS) return [{ text: `登录${Math.floor(left / DAY)}d`, color: p.warn }]
-  return o.always ? [{ text: `登录${Math.floor(left / DAY)}d`, color: p.label }] : []
+  if (left <= 0) return [{ text: '需重新登录', color: p.danger }]
+  if (left < DAY) return [{ text: `登录剩${Math.ceil(left / HOUR)}h`, color: p.danger }]
+  if (left <= LOGIN_WARN_MS) return [{ text: `登录剩${Math.floor(left / DAY)}d`, color: p.warn }]
+  return o.always ? [{ text: `登录剩${Math.floor(left / DAY)}d`, color: p.label }] : []
 }
 
 /**
@@ -299,7 +301,7 @@ function context(snap: Snapshot | null, p: Palette): Cell {
   const fraction = tokens / snap.threshold
   return {
     top: [label, { text: `${Math.round(fraction * 100)}%`, ...tone(fraction, p.value, p, true) }],
-    bottom: [{ text: `余${formatTokens(snap.threshold - tokens)}`, color: tone(fraction, p.label, p, false).color }],
+    bottom: [{ text: `剩${formatTokens(snap.threshold - tokens)}`, color: tone(fraction, p.label, p, false).color }],
   }
 }
 
