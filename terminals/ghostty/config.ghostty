@@ -1,0 +1,6 @@
+# 配色：跟着 macOS 的浅色 / 深色模式自动切换（Ghostty 自带主题）
+theme = light:GitHub Light Default,dark:GitHub Dark Default
+
+# 字体：中英文严格对齐，中文正好两格宽；先按 fonts/maple-mono-nf-cn 装好
+font-family = Maple Mono NF CN
+font-size = 15

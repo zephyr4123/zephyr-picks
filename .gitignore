@@ -1,0 +1,10 @@
+# Claude Code 本机设置（里面的自动记忆目录是本机绝对路径）
+.claude/settings.local.json
+
+# macOS 自动生成的目录元数据
+.DS_Store
+
+# 编辑器的本机配置
+.idea/
+.vscode/
+*.swp
