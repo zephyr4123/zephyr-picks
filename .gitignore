@@ -8,3 +8,7 @@
 .idea/
 .vscode/
 *.swp
+
+# Claude Code 插件运行时写进插件目录的东西：额度共享文件里有账号邮箱，类型文件由 Claude Code 自动生成
+claude-code-plugins/*/data/
+claude-code-plugins/*/.claude-plugin/types/
